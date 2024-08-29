@@ -28,3 +28,24 @@ def signup():
     db.session.commit()
 
     return jsonify({"message": "User created successfully"}), 201
+
+
+@auth.route("/signin", methods=["POST"])
+def signin():
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    # Check if the user exists
+    user = User.query.filter_by(email=email).first()
+    if user is None:
+        return jsonify({"errror": "Invalid email or password"}), 401
+
+    # Check if the user password matches
+    if not bcrypt.check_password_hash(user.password, password):
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    # Log the user in
+    # login_user(user)  # Ignore for now
+
+    return jsonify({"message": f"Welcome back, {user.username}!"}), 200
