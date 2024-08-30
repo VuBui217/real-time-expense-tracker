@@ -49,3 +49,12 @@ def signin():
     # login_user(user)  # Ignore for now
 
     return jsonify({"message": f"Welcome back, {user.username}!"}), 200
+
+
+@auth.route("/users", methods=["GET"])
+def list_users():
+    users = User.query.all()  # Query all users from the database
+    user_list = [
+        {"username": user.username, "email": user.email} for user in users
+    ]  # Create a list of user details
+    return jsonify(user_list)  # Return the list as a JSON response
