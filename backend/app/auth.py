@@ -75,13 +75,32 @@ def signin():
     email = data.get("email")
     password = data.get("password")
 
+    # Validate that email and password are provided
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+    if not password:
+        return jsonify({"error": "Password is required"}), 400
+
+    # Validate email length and format
+    if len(email) > 120:
+        return jsonify({"error": "Email must be 120 characters or fewer"}), 400
+    if not re.match(EMAIL_REGEX, email):
+        return jsonify({"error": "Invalid email address"}), 400
+
+    # Validate password length
+    if not (8 <= len(password) <= 20):
+        return (
+            jsonify({"error": "Password must be between 8 and 20 characters long"}),
+            400,
+        )
+
     # Check if the user exists
     user = User.query.filter_by(email=email).first()
     if user is None:
         return jsonify({"errror": "Invalid email or password"}), 401
 
     # Check if the user password matches
-    if not bcrypt.check_password_hash(user.password, password):
+    if user is None or not bcrypt.check_password_hash(user.password, password):
         return jsonify({"error": "Invalid email or password"}), 401
 
     # Log the user in
