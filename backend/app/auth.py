@@ -1,9 +1,13 @@
 import re
 from flask import Blueprint, request, jsonify
+from flask_login import LoginManager, login_required, login_user, current_user
 from app import db, bcrypt
 from app.models import User
 
 auth = Blueprint("auth", __name__)
+login_manager = LoginManager()
+login_manager.login_view = "auth.signin"
+
 
 # Email validation regex pattern
 EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
@@ -104,7 +108,7 @@ def signin():
         return jsonify({"error": "Invalid email or password"}), 401
 
     # Log the user in
-    # login_user(user)  # Ignore for now
+    login_user(user)
 
     return jsonify({"message": f"Welcome back, {user.username}!"}), 200
 
@@ -116,3 +120,56 @@ def list_users():
         {"username": user.username, "email": user.email} for user in users
     ]  # Create a list of user details
     return jsonify(user_list)  # Return the list as a JSON response
+
+
+@auth.route("/password-reset", methods=["POST"])
+def password_reset():
+    data = request.get_json()
+    token = data.get("token")
+    new_password = data.get("password")
+
+    # Find user by reset token
+    user = User.query.filter_by(reset_token=token).first()
+    if not user:
+        return jsonify({"error": "Invalid or expired token"}), 400
+
+    # Update the user's password
+    hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    user.password = hashed_password
+    user.reset_token = None  # Invalidate the token
+    db.session.commit()
+
+    return jsonify({"message": "Your password has been reset successfully"}), 200
+
+
+@auth.route("/change-password", methods=["PUT"])
+@login_required
+def change_password():
+    data = request.get_json()
+    current_password = data.get("current_password")
+    new_password = data.get("new_password")
+
+    # Validate presence of current and new passwords
+    if not current_password:
+        return jsonify({"error": "Current password is required"}), 400
+
+    if not new_password:
+        return jsonify({"error": "New password is required"}), 400
+
+    # Validate that the current password is correct
+    if not bcrypt.check_password_hash(current_user.password, current_password):
+        return jsonify({"error": "Incorrect current password"}), 400
+
+    # Validate the new password (e.g., length, complexity)
+    if len(new_password) < 8:
+        return (
+            jsonify({"error": "New password must be at least 8 characters long"}),
+            400,
+        )
+
+    # Hash the new password and update the user record
+    hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    current_user.password = hashed_password
+    db.session.commit()
+
+    return jsonify({"message": "Password updated successfully"}), 200

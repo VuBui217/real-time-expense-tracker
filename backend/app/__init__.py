@@ -3,19 +3,28 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from config import Config
+from flask_login import LoginManager
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 migrate = Migrate()
 
 
-def create_app(config_class=Config):    # Allow passing a config class
+def create_app(config_class=Config):  # Allow passing a config class
     app = Flask(__name__)
     app.config.from_object(config_class)
 
     db.init_app(app)
     bcrypt.init_app(app)
     migrate.init_app(app, db)
+    login_manager = LoginManager(app)
+    login_manager.login_view = "auth.signin"
+
+    from app.models import User
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
 
     from app.auth import auth as auth_blueprint
 

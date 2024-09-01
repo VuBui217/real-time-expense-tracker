@@ -2,6 +2,7 @@ import unittest
 from app import create_app, db, bcrypt
 from app.models import User
 from config import TestConfig
+from flask_bcrypt import Bcrypt
 
 
 class SignUpTestCase(unittest.TestCase):
@@ -191,7 +192,7 @@ class SignUpTestCase(unittest.TestCase):
         self.assertIn(b"Password is required", response.data)
 
 
-class SignUpTestCase(unittest.TestCase):
+class SignInTestCase(unittest.TestCase):
     def setUp(self):
         self.app = create_app(TestConfig)
         self.app_context = self.app.app_context()
@@ -290,7 +291,7 @@ class SignUpTestCase(unittest.TestCase):
         self.assertIn(b"Password is required", response.data)
 
 
-class UsersTestCase(unittest.TestCase):
+class GetUsersListTest(unittest.TestCase):
     def setUp(self):
         self.app = create_app(TestConfig)
         self.app_context = self.app.app_context()
@@ -332,6 +333,136 @@ class UsersTestCase(unittest.TestCase):
         response = self.client.get("/auth/users")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, [])  # Should return an empty list
+
+
+class ChangePasswordUserTest(unittest.TestCase):
+    def setUp(self):
+        # Set up the application and database for testing
+        self.app = create_app(TestConfig)
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+        self.client = self.app.test_client()
+        db.create_all()
+        self.bcrypt = Bcrypt(self.app)
+
+        # Create a test user
+        self.test_user = User(
+            username="testuser",
+            email="testuser@example.com",
+            password=self.bcrypt.generate_password_hash("password123").decode("utf-8"),
+        )
+        db.session.add(self.test_user)
+        db.session.commit()
+
+        # Log in the test user
+        self.client.post(
+            "/auth/signin",
+            json={"email": "testuser@example.com", "password": "password123"},
+        )
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        self.app_context.pop()
+
+    def test_change_password_success(self):
+        # Sign in the user and it also sets the current signing in user to be authenticated
+        # So the user now can change the password
+        # Step 1: Sign in the user
+        login_response = self.client.post(
+            "/auth/signin",
+            json={"email": "testuser@example.com", "password": "password123"},
+        )
+        # Debugging: Print the login response for verification
+        # print("Login Response:", login_response.data.decode())
+        self.assertEqual(login_response.status_code, 200)  # Ensure login was successful
+
+        # Step 2: Attempt to change password
+        response = self.client.put(
+            "/auth/change-password",
+            json={"current_password": "password123", "new_password": "newpassword123"},
+        )
+
+        # Debugging: Check the response status code
+        # print("Change Password Response Code:", response.status_code)
+        # print("Change Password Response Data:", response.data.decode())
+
+        # Check for a successful password change
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Password updated successfully", response.data.decode())
+
+        # Verify that the user's password has been changed in the database
+        user = User.query.filter_by(email="testuser@example.com").first()
+        self.assertTrue(bcrypt.check_password_hash(user.password, "newpassword123"))
+
+    def test_change_password_incorrect_current(self):
+        # Step 1: Sign in the user
+        login_response = self.client.post(
+            "/auth/signin",
+            json={"email": "testuser@example.com", "password": "password123"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+        # Step 2: Attempt to change the password with an incorrect current password
+        response = self.client.put(
+            "/auth/change-password",
+            json={
+                "current_password": "wrongpassword",
+                "new_password": "newpassword123",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Incorrect current password", response.data.decode())
+
+    def test_change_password_too_short(self):
+        # Step 1: Sign in the user
+        login_response = self.client.post(
+            "/auth/signin",
+            json={"email": "testuser@example.com", "password": "password123"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+        # Step 2: Attempt to change the password with a new password that is too short
+        response = self.client.put(
+            "/auth/change-password",
+            json={"current_password": "password123", "new_password": "short"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(
+            "New password must be at least 8 characters long", response.data.decode()
+        )
+
+    def test_change_password_missing_current_password(self):
+        # Step 1: Sign in the user
+        login_response = self.client.post(
+            "/auth/signin",
+            json={"email": "testuser@example.com", "password": "password123"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+        # Step 2: Attempt to change the password with missing current password
+        response = self.client.put(
+            "/auth/change-password",
+            json={"new_password": "newpassword123"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Current password is required", response.data.decode())
+
+    def test_change_password_missing_new_password(self):
+        # Step 1: Sign in the user
+        login_response = self.client.post(
+            "/auth/signin",
+            json={"email": "testuser@example.com", "password": "password123"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+        # Step 2: Attempt to change the password with missing new password
+        response = self.client.put(
+            "/auth/change-password",
+            json={"current_password": "password123"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("New password is required", response.data.decode())
 
 
 if __name__ == "__main__":
