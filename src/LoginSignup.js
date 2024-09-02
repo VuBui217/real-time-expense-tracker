@@ -15,7 +15,8 @@ const LoginSignup = () => {
   const handleAction = async () => {
     if (action === "Login") {
       try {
-        const response = await axios.post("http://127.0.0.1:5000/login", {
+        //   console.log({ email, password });
+        const response = await axios.post("http://127.0.0.1:5000/auth/signin", {
           email,
           password,
         });
@@ -24,7 +25,8 @@ const LoginSignup = () => {
       }
     } else {
       try {
-        const response = await axios.post("http://127.0.0.1:5000/signup", {
+        // console.log({ username, email, password });
+        const response = await axios.post("http://127.0.0.1:5000/auth/signup", {
           username,
           email,
           password,

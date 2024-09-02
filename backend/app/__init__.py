@@ -4,6 +4,7 @@ from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from config import Config
 from flask_login import LoginManager
+from flask_cors import CORS
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
@@ -12,6 +13,7 @@ migrate = Migrate()
 
 def create_app(config_class=Config):  # Allow passing a config class
     app = Flask(__name__)
+    CORS(app)  # Put CORS in the setup for flask app
     app.config.from_object(config_class)
 
     db.init_app(app)
