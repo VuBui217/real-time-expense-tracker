@@ -10,9 +10,35 @@ const LoginSignup = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setloading] = useState(false);
+  // Validate email
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+  // Validate form inputs
+  const validateForm = () => {
+    if (!email || !password || (action === "Sign Up" && !username)) {
+      alert("Please fill in all required fill.");
+      return false;
+    }
+    if (!isValidEmail(email)) {
+      alert("Please enter a valid email address.");
+      return false;
+    }
+    return true;
+  };
+  // Reset form fields
+  const resetForm = () => {
+    setUsername("");
+    setEmail("");
+    setPassword("");
+  };
 
   // Handle action 'Login' and 'Sign Up'
   const handleAction = async () => {
+    if (!validateForm()) return;
+    setloading(true);
     if (action === "Login") {
       try {
         //   console.log({ email, password });
@@ -20,6 +46,7 @@ const LoginSignup = () => {
           email,
           password,
         });
+        resetForm(); // Reset form after login
       } catch (error) {
         alert("Error: " + error.response.data.message);
       }
@@ -32,8 +59,11 @@ const LoginSignup = () => {
           password,
         });
         alert("User created successfully");
+        resetForm(); // Reset form after signup
       } catch (error) {
         alert("Error: " + error.response.data.message);
+      } finally {
+        setloading(false);
       }
     }
   };
@@ -102,8 +132,13 @@ const LoginSignup = () => {
           Forgot Password? <span>Click Here</span>
         </div>
       )}
-      <button type="button" className="submit-button" onClick={handleAction}>
-        Submit
+      <button
+        type="button"
+        className="submit-button"
+        onClick={handleAction}
+        disabled={loading}
+      >
+        {loading ? "Submitting..." : "Submit"}
       </button>
     </div>
   );

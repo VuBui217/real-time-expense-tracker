@@ -117,7 +117,7 @@ def signin():
 def list_users():
     users = User.query.all()  # Query all users from the database
     user_list = [
-        {"username": user.username, "email": user.email} for user in users
+        {"username": user.username, "email": user.email, "password": user.password} for user in users
     ]  # Create a list of user details
     return jsonify(user_list)  # Return the list as a JSON response
 
@@ -134,7 +134,8 @@ def password_reset():
         return jsonify({"error": "Invalid or expired token"}), 400
 
     # Update the user's password
-    hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    hashed_password = bcrypt.generate_password_hash(
+        new_password).decode("utf-8")
     user.password = hashed_password
     user.reset_token = None  # Invalidate the token
     db.session.commit()
@@ -168,7 +169,8 @@ def change_password():
         )
 
     # Hash the new password and update the user record
-    hashed_password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    hashed_password = bcrypt.generate_password_hash(
+        new_password).decode("utf-8")
     current_user.password = hashed_password
     db.session.commit()
 
