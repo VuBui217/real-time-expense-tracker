@@ -1,21 +1,10 @@
-import logo from "./logo.svg";
 import "./App.css";
+import LoginSignup from "./LoginSignup";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>Bin Bin and Phu Phu are best friends</p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <LoginSignup />
     </div>
   );
 }
