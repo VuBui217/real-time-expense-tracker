@@ -38,11 +38,11 @@ const Expenses = () => {
       <Sidebar />
       <div className="content">
         <h2>Expenses</h2>
-        <button onClick={handleAddClick}>Add Transaction</button>
+        <button onClick={handleAddClick}>Add Expenses</button>
 
         {/* Transaction List */}
         <div>
-          <h3>All Transactions</h3>
+          <h3>All Expenses</h3>
           <ul>
             {expenses.map((expense) => (
               <li key={expense.id}>
