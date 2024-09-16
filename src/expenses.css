@@ -1,0 +1,20 @@
+/* Expenses.css */
+.expenses-container {
+    display: flex;
+  }
+  
+  .content {
+    margin-left: 200px;
+    padding: 20px;
+    width: 100%;
+    background-color: #f9f9f9;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+  }
+  
+  @media screen and (max-width: 768px) {
+    .content {
+      margin-left: 0;
+    }
+  }
+  

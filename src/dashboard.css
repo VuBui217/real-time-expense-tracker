@@ -1,0 +1,18 @@
+/* Dashboard.css */
+
+.dashboard-container {
+    display: flex;
+    
+  }
+  
+  .content {
+    margin-left: 200px; /* Default margin when sidebar is expanded */
+    padding: 20px;
+    width: 100%;
+    transition: margin-left 0.3s ease; /* Smooth transition when sidebar is toggled */
+  }
+  
+  .sidebar-collapsed ~ .content {
+    margin-left: 60px; /* Adjust margin when sidebar is collapsed */
+  }
+  

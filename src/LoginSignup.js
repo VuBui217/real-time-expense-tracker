@@ -4,26 +4,40 @@ import user_icon from "./Assets/person.png";
 import password_icon from "./Assets/password.png";
 import email_icon from "./Assets/email.png";
 import axios from "axios";
-
+import { useNavigate } from "react-router-dom";
+//import { useHistory } from "react-router-dom";
 const LoginSignup = () => {
   const [action, setAction] = useState("Login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setloading] = useState(false);
+  const navigate = useNavigate();
   // Validate email
   const isValidEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
+  // Validate password complexity
+  const isValidPassword = (password) => {
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    return passwordRegex.test(password);
+  };
   // Validate form inputs
   const validateForm = () => {
     if (!email || !password || (action === "Sign Up" && !username)) {
-      alert("Please fill in all required fill.");
+      alert("Please fill in all required fields.");
       return false;
     }
     if (!isValidEmail(email)) {
       alert("Please enter a valid email address.");
+      return false;
+    }
+    if (!isValidPassword(password)) {
+      alert(
+        "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+      );
       return false;
     }
     return true;
@@ -47,8 +61,13 @@ const LoginSignup = () => {
           password,
         });
         resetForm(); // Reset form after login
+        //history.push("/dashboard"); // Redirect to Dashboard after login
+        navigate("/dashboard");
       } catch (error) {
-        alert("Error: " + error.response.data.message);
+        alert(
+          "Error: " +
+            (error.response ? error.response.data.message : error.message)
+        );
       }
     } else {
       try {
@@ -61,7 +80,10 @@ const LoginSignup = () => {
         alert("User created successfully");
         resetForm(); // Reset form after signup
       } catch (error) {
-        alert("Error: " + error.response.data.message);
+        alert(
+          "Error: " +
+            (error.response ? error.response.data.message : error.message)
+        );
       } finally {
         setloading(false);
       }
