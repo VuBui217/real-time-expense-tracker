@@ -35,7 +35,7 @@ def signup():
             400,
         )
 
-    # Validate email length (optional, since your model already restricts it)
+    # Validate email length
     if len(email) > 120:
         return jsonify({"error": "Email must be 120 characters or fewer"}), 400
 
