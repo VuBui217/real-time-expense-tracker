@@ -7,7 +7,7 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "mysecret")
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL',
-                                        'postgresql://vubui217:76townboyxyz@localhost/expense_app_tracker_db')
+                                        'postgresql://postgres:123456@localhost/userInfo')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 

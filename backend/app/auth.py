@@ -1,118 +1,261 @@
 import re
 from flask import Blueprint, request, jsonify
-from flask_login import LoginManager, login_required, login_user, current_user
+from flask_login import login_user, login_required, current_user
 from app import db, bcrypt
-from app.models import User
+from app.models import Users, Expense
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+from datetime import datetime, timedelta, timezone
+from functools import wraps
+from sqlalchemy import func
 
 auth = Blueprint("auth", __name__)
-login_manager = LoginManager()
-login_manager.login_view = "auth.signin"
-
 
 @auth.route("/signup", methods=["POST"])
 def signup():
     data = request.get_json()
+    print("Received data:", data)  # Check if request data is correct
     username = data.get("username")
     email = data.get("email")
     password = data.get("password")
 
-    # Check if the username or email already exists
-    user_exists = User.query.filter(
-        (User.email == email) | (User.username == username)
-    ).first()
+    if not username or not email or not password:
+        print("Missing fields")
+        return jsonify({"error": "Username, email, and password are required"}), 400
 
-    if user_exists:
-        return jsonify({"error": "Username or email already exists"}), 400
+    # Check if the user already exists by email
+    user = Users.query.filter_by(email=email).first()
+    print("User from database:", user)  # Check what is returned from the query
+    if user:
+        return jsonify({"message": "User already exists. Please sign in."}), 400
 
-    # Hash the password
-    hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+    # Create a new user
+    new_user = Users(
+        username=username,
+        email=email,
+        password=generate_password_hash(password)
+    )
+    
+    print("Created user successfully:")  # Check if new user is created
 
-    # Create a new user and add to the database
-    user = User(username=username, email=email, password=hashed_password)
-    db.session.add(user)
-    db.session.commit()
+    # Add the user to the database
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({"message": "User created successfully"}), 201
+    except Exception as e:
+        # Handle any database errors
+        db.session.rollback()
+        print("Error:", e)
+        return jsonify({"error": str(e)}), 500
 
-    return jsonify({"message": "User created successfully"}), 201
 
 
+# Route for signin
 @auth.route("/signin", methods=["POST"])
 def signin():
     data = request.get_json()
-    email = data.get("email")
-    password = data.get("password")
+    if not data or not data.get("email") or not data.get("password"):
+        return jsonify({"Error": "Proper credentials were not provided"}), 401
 
-    # Check if the user exists
-    user = User.query.filter_by(email=email).first()
-
-    # Check if the user password matches
-    if user is None or not bcrypt.check_password_hash(user.password, password):
-        return jsonify({"error": "Invalid email or password"}), 401
-
-    # Log the user in
-    login_user(user)
-
-    return jsonify({"message": f"Welcome back, {user.username}!"}), 200
-
-
-@auth.route("/users", methods=["GET"])
-def list_users():
-    users = User.query.all()  # Query all users from the database
-    user_list = [
-        {"username": user.username, "email": user.email} for user in users
-    ]  # Create a list of user details
-    return jsonify(user_list)  # Return the list as a JSON response
-
-
-@auth.route("/password-reset", methods=["POST"])
-def password_reset():
-    data = request.get_json()
-    token = data.get("token")
-    new_password = data.get("password")
-
-    # Find user by reset token
-    user = User.query.filter_by(reset_token=token).first()
+    user = Users.query.filter(Users.email == data.get("email")).first()
     if not user:
-        return jsonify({"error": "Invalid or expired token"}), 400
+        return jsonify({"Error": "Please create an account"}), 401
 
-    # Update the user's password
-    hashed_password = bcrypt.generate_password_hash(
-        new_password).decode("utf-8")
-    user.password = hashed_password
-    user.reset_token = None  # Invalidate the token
+    if check_password_hash(user.password, data.get("password")):
+        
+        token = jwt.encode({
+            'id': user.id,
+            'exp': datetime.utcnow() + timedelta(minutes=3)
+        }, "secret", algorithm="HS256")
+        return jsonify({'token': token}), 201
+
+    return jsonify({"Error": "Please check your credentials"}), 401
+
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if "Authorization" in request.headers:
+            token_header = request.headers["Authorization"]
+
+
+            # Check if token starts with "Bearer"
+            if token_header.startswith("Bearer "):
+                token = token_header.split(" ")[1]  # Extract token part
+   
+            
+        if not token:
+            print("Token is missing")
+            return jsonify({"Message": "Token is missing"}), 401
+
+        try:
+            # Decode the JWT using the secret key
+            secret_key = "secret"
+            user_data = jwt.decode(token, secret_key, algorithms=["HS256"])
+            current_user = Users.query.filter_by(id=user_data["id"]).first()
+
+            if not current_user:
+                print("User not found")
+                return jsonify({"Message": "User not found"}), 404
+
+        except jwt.ExpiredSignatureError:
+            print("Token has expired")
+            return jsonify({"Message": "Token has expired"}), 401
+
+        except jwt.InvalidTokenError:
+            print("Token is invalid")
+            return jsonify({"Message": "Token is invalid"}), 401
+
+        # Proceed if the token is valid and user is found
+        return f(current_user, *args, **kwargs)
+
+    return decorated
+
+    
+    
+    
+
+@auth.route("/expenses", methods=["GET"])
+@token_required
+def getAllFunds(current_user):
+    # Query expenses for the current user
+    expenses = Expense.query.filter_by(userId=current_user.id).all()
+
+    # Initialize total sum
+    totalSum = 0
+
+    # If there are expenses, calculate the total sum
+    if expenses:
+        totalSum = db.session.query(db.func.round(db.func.sum(Expense.amount), 2)).filter_by(userId=current_user.id).scalar() or 0
+    
+    # Return the list of expenses and the total sum
+    return jsonify({
+        "Data": [expense.serialize for expense in expenses],
+        "sum": float(totalSum)  # Make sure the sum is returned as a float
+    })
+    
+    
+    
+    
+
+@auth.route("/expenses", methods=["POST"])
+@token_required  # Assuming this decorator verifies the JWT and provides current_user
+def createExpense(current_user):
+    data = request.get_json()  # Get the JSON data from the request body
+    amount = data.get("amount")
+    description = data.get("description")
+    category = data.get("category")
+    
+    # Validate that all required fields are present
+    if not amount or not description or not category:
+        return jsonify({"error": "Amount, description, and category are required"}), 400
+
+    # Create a new expense
+    expense = Expense(
+        amount=amount,  # Get amount from request data
+        userId=current_user.id,  # Use the authenticated user's ID from JWT
+        description=description,  # Get description from request data
+        category=category  # Get category from request data
+    )
+
+    # Add the expense to the database
+    db.session.add(expense)
     db.session.commit()
 
-    return jsonify({"message": "Your password has been reset successfully"}), 200
+    # Optionally, serialize the expense to return in the response
+    return jsonify({
+        "message": "Expense created successfully",
+        "expense": {
+            "id": expense.id,
+            "amount": float(expense.amount),  # Make sure to convert amount to float
+            "description": expense.description,
+            "category": expense.category,
+            "created_at": expense.created_at
+        }
+    }), 201
 
 
-@auth.route("/change-password", methods=["PUT"])
-@login_required
-def change_password():
+
+
+@auth.route("/expenses/<int:expense_id>", methods=["DELETE"])
+@token_required
+def delete_expense(current_user, expense_id):
+    # Find the expense by ID and ensure it belongs to the current user
+    expense = Expense.query.filter_by(id=expense_id, userId=current_user.id).first()
+
+    if not expense:
+        return jsonify({"error": "Expense not found or does not belong to the user"}), 404
+
+    try:
+        # Delete the expense from the database
+        db.session.delete(expense)
+        db.session.commit()
+        return jsonify({"message": "Expense deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+@auth.route("/expenses/<int:expense_id>", methods=["PUT"])
+@token_required
+def edit_expense(current_user, expense_id):
+ 
     data = request.get_json()
-    current_password = data.get("current_password")
-    new_password = data.get("new_password")
+ 
 
-    # Validate presence of current and new passwords
-    if not current_password:
-        return jsonify({"error": "Current password is required"}), 400
+    # Validate input data
+    if not data:
+  
+        return jsonify({"error": "No input data provided"}), 400
 
-    if not new_password:
-        return jsonify({"error": "New password is required"}), 400
+    # Find the existing expense for the authenticated user
+ 
+    expense = Expense.query.filter_by(id=expense_id, userId=current_user.id).first()
 
-    # Validate that the current password is correct
-    if not bcrypt.check_password_hash(current_user.password, current_password):
-        return jsonify({"error": "Incorrect current password"}), 400
 
-    # Validate the new password (e.g., length, complexity)
-    if len(new_password) < 8:
-        return (
-            jsonify({"error": "New password must be at least 8 characters long"}),
-            400,
-        )
+    if not expense:
 
-    # Hash the new password and update the user record
-    hashed_password = bcrypt.generate_password_hash(
-        new_password).decode("utf-8")
-    current_user.password = hashed_password
-    db.session.commit()
+        return jsonify({"error": "Expense not found or does not belong to the user"}), 404
 
-    return jsonify({"message": "Password updated successfully"}), 200
+
+
+    # Update the fields if they are provided in the request
+    if "amount" in data:
+        expense.amount = data["amount"]
+
+    if "description" in data:
+        expense.description = data["description"]
+
+    if "category" in data:
+        expense.category = data["category"]
+
+
+  
+
+    try:
+  
+        db.session.commit()
+        return jsonify({
+            "message": "Expense updated successfully",
+            "expense": {
+                "id": expense.id,
+                "amount": float(expense.amount),
+                "description": expense.description,
+                "category": expense.category,
+                "created_at": expense.created_at
+            }
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred while updating the expense"}), 500
+

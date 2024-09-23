@@ -5,7 +5,7 @@ import password_icon from "./Assets/password.png";
 import email_icon from "./Assets/email.png";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-//import { useHistory } from "react-router-dom";
+
 const LoginSignup = () => {
   const [action, setAction] = useState("Login");
   const [username, setUsername] = useState("");
@@ -13,17 +13,20 @@ const LoginSignup = () => {
   const [password, setPassword] = useState("");
   const [loading, setloading] = useState(false);
   const navigate = useNavigate();
+
   // Validate email
   const isValidEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
+
   // Validate password complexity
   const isValidPassword = (password) => {
     const passwordRegex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
     return passwordRegex.test(password);
   };
+
   // Validate form inputs
   const validateForm = () => {
     if (!email || !password || (action === "Sign Up" && !username)) {
@@ -42,6 +45,7 @@ const LoginSignup = () => {
     }
     return true;
   };
+
   // Reset form fields
   const resetForm = () => {
     setUsername("");
@@ -49,46 +53,62 @@ const LoginSignup = () => {
     setPassword("");
   };
 
-  // Handle action 'Login' and 'Sign Up'
+  // Handle Login or Signup Action
   const handleAction = async () => {
     if (!validateForm()) return;
     setloading(true);
+
     if (action === "Login") {
+      
       try {
-        //   console.log({ email, password });
         const response = await axios.post("http://127.0.0.1:5000/auth/signin", {
           email,
           password,
-        });
-        resetForm(); // Reset form after login
-        //history.push("/dashboard"); // Redirect to Dashboard after login
-        navigate("/dashboard");
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+      });
+
+        const token = response.data.token;
+        console.log("Token received from backend:", token);
+        if (token) {
+          localStorage.setItem("token", token);  // Save token to localStorage
+          navigate("/dashboard"); // Redirect to Dashboard after login
+        } else {
+          alert("No token received. Please try again.");
+        }
       } catch (error) {
         alert(
-          "Error: " +
-            (error.response ? error.response.data.message : error.message)
+          "Error: " + (error.response ? error.response.data.message : error.message)
         );
+      } finally {
+        setloading(false);
       }
     } else {
       try {
-        // console.log({ username, email, password });
         const response = await axios.post("http://127.0.0.1:5000/auth/signup", {
           username,
           email,
           password,
         });
-        alert("User created successfully");
-        resetForm(); // Reset form after signup
+
+        if (response.status === 201) {
+          alert("User created successfully");
+          resetForm(); // Reset form after signup
+          setAction("Login"); // Switch to login after signup
+        }
       } catch (error) {
         alert(
-          "Error: " +
-            (error.response ? error.response.data.message : error.message)
+          "Error: " + (error.response ? error.response.data.message : error.message)
         );
       } finally {
         setloading(false);
       }
     }
   };
+
   return (
     <div className="container">
       <div className="header">
@@ -98,25 +118,19 @@ const LoginSignup = () => {
       <div className="submit-container">
         <div
           className={action === "Login" ? "submit gray" : "submit"}
-          onClick={() => {
-            setAction("Sign Up");
-          }}
+          onClick={() => setAction("Sign Up")}
         >
           Sign Up
         </div>
         <div
           className={action === "Sign Up" ? "submit gray" : "submit"}
-          onClick={() => {
-            setAction("Login");
-          }}
+          onClick={() => setAction("Login")}
         >
           Login
         </div>
       </div>
       <div className="inputs">
-        {action === "Login" ? (
-          <div></div>
-        ) : (
+        {action === "Login" ? null : (
           <div className="input">
             <img src={user_icon} alt="" />
             <input
@@ -147,9 +161,7 @@ const LoginSignup = () => {
           />
         </div>
       </div>
-      {action === "Sign Up" ? (
-        <div></div>
-      ) : (
+      {action === "Sign Up" ? null : (
         <div className="forgot-password">
           Forgot Password? <span>Click Here</span>
         </div>
@@ -167,3 +179,4 @@ const LoginSignup = () => {
 };
 
 export default LoginSignup;
+

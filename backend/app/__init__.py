@@ -11,6 +11,7 @@ bcrypt = Bcrypt()
 migrate = Migrate()
 
 
+
 def create_app(config_class=Config):  # Allow passing a config class
     app = Flask(__name__)
     CORS(app)  # Put CORS in the setup for flask app
@@ -22,14 +23,24 @@ def create_app(config_class=Config):  # Allow passing a config class
     login_manager = LoginManager(app)
     login_manager.login_view = "auth.signin"
 
-    from app.models import User
+    from app.models import Users
 
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        return Users.query.get(int(user_id))
 
     from app.auth import auth as auth_blueprint
+    
+    
 
-    app.register_blueprint(auth_blueprint, url_prefix="/auth")
+    # app.register_blueprint(auth_blueprint, url_prefix="/auth")
+
+    print("Registering blueprints...")
+    try:
+        from app.auth import auth as auth_blueprint
+        app.register_blueprint(auth_blueprint, url_prefix="/auth")
+        print("Blueprint registered successfully!")
+    except Exception as e:
+        print(f"Error during blueprint registration: {e}")
 
     return app
